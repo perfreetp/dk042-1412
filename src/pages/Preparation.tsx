@@ -2,40 +2,49 @@ import { useState, useMemo } from "react";
 import {
   ClipboardCheck,
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   Clock,
-  Phone,
   Send,
   Wifi,
   MapPin,
   UserCheck,
   ChevronRight,
   Bell,
+  Sunrise,
+  Sunset,
 } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
 import { CheckBadge } from "@/components/common/StatusBadge";
+import { ContactButton } from "@/components/common/ContactDriverModal";
+import ShiftConfig from "@/components/preparation/ShiftConfig";
 import { useAppStore } from "@/store";
 import { useCountdown } from "@/hooks/useTimer";
+import type { ShiftType } from "@/types";
 
 const SCHOOL_DISMISS_TIME = 25;
 
 export default function Preparation() {
   const checks = useAppStore((s) => s.preparationChecks);
+  const shifts = useAppStore((s) => s.shifts);
   const toggleDriverConfirm = useAppStore((s) => s.toggleDriverConfirm);
   const sendReminder = useAppStore((s) => s.sendReminder);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
+  const [activeShiftType, setActiveShiftType] = useState<ShiftType>("afternoon");
+  const [showShiftConfig, setShowShiftConfig] = useState(false);
 
   const timeLeft = useCountdown(SCHOOL_DISMISS_TIME);
 
+  const activeShift = shifts.find((s) => s.type === activeShiftType)!;
+  const activeChecks = checks.filter((c) => c.shiftId === activeShift.id);
+
   const stats = useMemo(() => {
-    const online = checks.filter((c) => c.isOnline).length;
-    const gpsOk = checks.filter((c) => c.isGpsNormal).length;
-    const confirmed = checks.filter((c) => c.isDriverConfirmed).length;
-    const total = checks.length;
+    const online = activeChecks.filter((c) => c.isOnline).length;
+    const gpsOk = activeChecks.filter((c) => c.isGpsNormal).length;
+    const confirmed = activeChecks.filter((c) => c.isDriverConfirmed).length;
+    const total = activeChecks.length;
     const allReady = online === total && gpsOk === total && confirmed === total;
     return { online, gpsOk, confirmed, total, allReady, notReady: total - confirmed };
-  }, [checks]);
+  }, [activeChecks]);
 
   const phases = [
     {
@@ -61,7 +70,9 @@ export default function Preparation() {
     },
   ];
 
-  const notReadyList = checks.filter((c) => !c.isOnline || !c.isGpsNormal || !c.isDriverConfirmed);
+  const notReadyList = activeChecks.filter(
+    (c) => !c.isOnline || !c.isGpsNormal || !c.isDriverConfirmed
+  );
 
   const handleSendAllReminders = () => {
     notReadyList.forEach((c) => {
@@ -79,47 +90,63 @@ export default function Preparation() {
           </p>
         </div>
 
-        <div className="card-base p-5 flex items-center gap-5 bg-gradient-to-br from-accent-yellow/10 to-transparent border-accent-yellow/30">
-          <div className="text-center">
-            <div className="text-xs text-navy-400 mb-1">距离放学还有</div>
-            <div className="flex items-baseline gap-1 font-mono font-bold">
-              <span className="text-4xl text-accent-yellow">
-                {String(timeLeft.minutes).padStart(2, "0")}
-              </span>
-              <span className="text-accent-yellow/60 text-xl">:</span>
-              <span className="text-4xl text-accent-yellow">
-                {String(timeLeft.seconds).padStart(2, "0")}
-              </span>
-              <span className="text-sm text-navy-400 ml-1">分钟</span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowShiftConfig((v) => !v)}
+            className="btn-secondary text-sm flex items-center gap-2"
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            {showShiftConfig ? "收起班次配置" : "查看班次配置"}
+          </button>
+
+          <div className="card-base p-5 flex items-center gap-5 bg-gradient-to-br from-accent-yellow/10 to-transparent border-accent-yellow/30">
+            <div className="text-center">
+              <div className="text-xs text-navy-400 mb-1">距离放学还有</div>
+              <div className="flex items-baseline gap-1 font-mono font-bold">
+                <span className="text-4xl text-accent-yellow">
+                  {String(timeLeft.minutes).padStart(2, "0")}
+                </span>
+                <span className="text-accent-yellow/60 text-xl">:</span>
+                <span className="text-4xl text-accent-yellow">
+                  {String(timeLeft.seconds).padStart(2, "0")}
+                </span>
+                <span className="text-sm text-navy-400 ml-1">分钟</span>
+              </div>
             </div>
-          </div>
-          <div className="w-px h-14 bg-navy-700" />
-          <div className="space-y-1.5">
-            <div className="text-sm text-navy-300">
-              {stats.allReady ? (
-                <span className="flex items-center gap-1.5 text-accent-green font-medium">
-                  <CheckCircle2 className="w-4 h-4" />
-                  所有车辆准备就绪
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5 text-accent-yellow font-medium">
-                  <AlertTriangle className="w-4 h-4" />
-                  还有 {stats.notReady} 辆车未确认
-                </span>
+            <div className="w-px h-14 bg-navy-700" />
+            <div className="space-y-1.5">
+              <div className="text-sm text-navy-300">
+                {stats.allReady ? (
+                  <span className="flex items-center gap-1.5 text-accent-green font-medium">
+                    <CheckCircle2 className="w-4 h-4" />
+                    所有车辆准备就绪
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-accent-yellow font-medium">
+                    <AlertTriangle className="w-4 h-4" />
+                    还有 {stats.notReady} 辆车未确认
+                  </span>
+                )}
+              </div>
+              {!stats.allReady && (
+                <button
+                  onClick={handleSendAllReminders}
+                  className="btn-danger text-sm py-1.5 px-3 flex items-center gap-1.5"
+                >
+                  <Bell className="w-4 h-4" />
+                  一键批量提醒
+                </button>
               )}
             </div>
-            {!stats.allReady && (
-              <button
-                onClick={handleSendAllReminders}
-                className="btn-danger text-sm py-1.5 px-3 flex items-center gap-1.5"
-              >
-                <Bell className="w-4 h-4" />
-                一键批量提醒
-              </button>
-            )}
           </div>
         </div>
       </div>
+
+      {showShiftConfig && (
+        <div className="animate-fade-in">
+          <ShiftConfig />
+        </div>
+      )}
 
       <div className="grid grid-cols-4 gap-4">
         <StatCard
@@ -147,6 +174,36 @@ export default function Preparation() {
           color={notReadyList.length === 0 ? "green" : "red"}
           trend={notReadyList.length === 0 ? "全部就绪" : "需要处理"}
         />
+      </div>
+
+      <div className="flex items-center gap-2 p-1 bg-navy-900/50 rounded-lg w-fit">
+        {shifts.map((shift) => {
+          const Icon = shift.type === "morning" ? Sunrise : Sunset;
+          const isActive = activeShiftType === shift.type;
+          const shiftChecks = checks.filter((c) => c.shiftId === shift.id);
+          const shiftProblems = shiftChecks.filter(
+            (c) => !c.isOnline || !c.isGpsNormal || !c.isDriverConfirmed
+          ).length;
+          return (
+            <button
+              key={shift.id}
+              onClick={() => setActiveShiftType(shift.type)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                isActive
+                  ? "bg-navy-700 text-white"
+                  : "text-navy-300 hover:text-white hover:bg-navy-800/50"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {shift.name}
+              {shiftProblems > 0 && (
+                <span className="px-1.5 py-0.5 bg-accent-red/20 text-accent-red text-xs rounded-full font-bold">
+                  {shiftProblems}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-12 gap-6">
@@ -207,9 +264,9 @@ export default function Preparation() {
 
           {notReadyList.length > 0 && (
             <div className="card-base p-5 mt-5 border-accent-red/30 bg-gradient-to-br from-accent-red/5 to-transparent">
-              <h2 className="text-base font-bold text-accent-red mb-4 flex items-center gap-2">
+              <h2 className="text-base font-bold text-accent-red mb-2 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5" />
-                未完成项汇总
+                {activeShift.name}未完成项
               </h2>
               <p className="text-xs text-navy-400 mb-3">
                 以下车辆需要值班老师跟进处理
@@ -252,11 +309,12 @@ export default function Preparation() {
 
         <div className="col-span-8">
           <div className="card-base overflow-hidden">
-            <div className="p-5 border-b border-navy-700/50">
+            <div className="p-5 border-b border-navy-700/50 flex items-center justify-between">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <ClipboardCheck className="w-5 h-5 text-accent-green" />
-                车辆检查列表
+                {activeShift.name} - 车辆检查列表
               </h2>
+              <span className="text-xs text-navy-400">共 {activeChecks.length} 辆</span>
             </div>
 
             <div className="overflow-x-auto">
@@ -287,7 +345,7 @@ export default function Preparation() {
                   </tr>
                 </thead>
                 <tbody>
-                  {checks.map((c) => {
+                  {activeChecks.map((c) => {
                     const isExpanded = selectedBusId === c.busId;
                     return (
                       <>
@@ -296,7 +354,7 @@ export default function Preparation() {
                           onClick={() => setSelectedBusId(isExpanded ? null : c.busId)}
                           className={`border-b border-navy-700/30 hover:bg-navy-800/30 cursor-pointer transition-colors ${
                             (!c.isOnline || !c.isGpsNormal || !c.isDriverConfirmed)
-                              ? "bg-accent-red/3"
+                              ? "bg-accent-red/5"
                               : ""
                           }`}
                         >
@@ -319,12 +377,10 @@ export default function Preparation() {
                           </td>
                           <td className="px-5 py-4 text-center">
                             {c.isDriverConfirmed ? (
-                              <div>
-                                <span className="status-badge bg-accent-green/15 text-accent-green">
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  已确认 {c.confirmTime}
-                                </span>
-                              </div>
+                              <span className="status-badge bg-accent-green/15 text-accent-green">
+                                <CheckCircle2 className="w-3 h-3" />
+                                已确认 {c.confirmTime}
+                              </span>
                             ) : (
                               <span className="status-badge bg-accent-yellow/15 text-accent-yellow">
                                 <Clock className="w-3 h-3" />
@@ -362,14 +418,13 @@ export default function Preparation() {
                               >
                                 <Send className="w-4 h-4" />
                               </button>
-                              <a
-                                href={`tel:${c.driverPhone}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="p-2 rounded-lg bg-navy-700 text-navy-300 hover:bg-accent-green/20 hover:text-accent-green transition-colors"
-                                title="联系司机"
-                              >
-                                <Phone className="w-4 h-4" />
-                              </a>
+                              <ContactButton
+                                name={c.driverName}
+                                phone={c.driverPhone}
+                                busPlate={c.busPlateNumber}
+                                variant="icon"
+                                onContacted={() => sendReminder(c.busId)}
+                              />
                             </div>
                           </td>
                         </tr>
@@ -398,13 +453,14 @@ export default function Preparation() {
                                   >
                                     {c.isDriverConfirmed ? "取消确认" : "标记司机已确认"}
                                   </button>
-                                  <button
-                                    onClick={() => sendReminder(c.busId)}
-                                    className="btn-primary flex items-center gap-2"
-                                  >
-                                    <Send className="w-4 h-4" />
-                                    发送发车提醒
-                                  </button>
+                                  <ContactButton
+                                    name={c.driverName}
+                                    phone={c.driverPhone}
+                                    busPlate={c.busPlateNumber}
+                                    variant="primary"
+                                    label="联系司机"
+                                    onContacted={() => sendReminder(c.busId)}
+                                  />
                                 </div>
                               </div>
                             </td>

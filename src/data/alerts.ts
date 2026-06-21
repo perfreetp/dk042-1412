@@ -14,6 +14,7 @@ export const alerts: Alert[] = [
     location: "南环路与滨江大道交叉口",
     timestamp: "2026-06-22 07:18:22",
     status: "pending",
+    contactLog: [],
   },
   {
     id: "a002",
@@ -28,8 +29,18 @@ export const alerts: Alert[] = [
     location: "绿城花园地下车库入口",
     timestamp: "2026-06-22 07:05:40",
     status: "processing",
-    handler: "张管理员",
-    handleTime: "2026-06-22 07:12:00",
+    contactLog: [
+      {
+        id: "cl1",
+        method: "call",
+        target: "138****6789",
+        operator: "王主任",
+        timestamp: "2026-06-22 07:12:00",
+        note: "电话无人接听，已留言",
+      },
+    ],
+    handler: "王主任",
+    processStartTime: "2026-06-22 07:12:00",
   },
   {
     id: "a003",
@@ -44,6 +55,7 @@ export const alerts: Alert[] = [
     location: "文化路128号附近",
     timestamp: "2026-06-22 07:22:15",
     status: "pending",
+    contactLog: [],
   },
 ];
 
@@ -61,9 +73,21 @@ export const resolvedAlerts: Alert[] = [
     location: "人民广场站",
     timestamp: "2026-06-22 06:55:30",
     status: "resolved",
+    contactLog: [
+      {
+        id: "cl2",
+        method: "call",
+        target: "138****2345",
+        operator: "李主任",
+        timestamp: "2026-06-22 06:58:00",
+        note: "司机接听，说明在等待迟到学生",
+      },
+    ],
     handler: "李主任",
+    disposeReason: "student_waited",
     handleResult: "司机解释为等待迟到学生3名，已正常发车",
     handleTime: "2026-06-22 07:02:15",
+    processStartTime: "2026-06-22 06:58:00",
   },
   {
     id: "a005",
@@ -78,8 +102,28 @@ export const resolvedAlerts: Alert[] = [
     location: "学府路维修段",
     timestamp: "2026-06-22 06:45:00",
     status: "resolved",
-    handler: "张管理员",
+    contactLog: [
+      {
+        id: "cl3",
+        method: "sms",
+        target: "138****4567",
+        operator: "王主任",
+        timestamp: "2026-06-22 06:48:00",
+        note: "发送短信询问绕行原因",
+      },
+      {
+        id: "cl4",
+        method: "call",
+        target: "138****4567",
+        operator: "王主任",
+        timestamp: "2026-06-22 06:50:00",
+        note: "司机回复前方道路施工临时改道",
+      },
+    ],
+    handler: "王主任",
+    disposeReason: "route_adjusted",
     handleResult: "道路施工临时改道，已告知照管员并重新规划路线",
     handleTime: "2026-06-22 06:52:30",
+    processStartTime: "2026-06-22 06:48:00",
   },
 ];

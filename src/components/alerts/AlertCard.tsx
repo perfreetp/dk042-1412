@@ -3,16 +3,20 @@ import {
   AlertTriangle,
   MapPin,
   Clock,
-  Phone,
   User,
   CheckCircle,
-  MessageSquare,
   Route,
   Ban,
+  Phone,
+  MessageSquare,
+  PhoneCall,
+  History,
 } from "lucide-react";
 import StatusBadge, { LevelBadge } from "@/components/common/StatusBadge";
+import { ContactButton } from "@/components/common/ContactDriverModal";
 import { useAppStore } from "@/store";
-import type { Alert } from "@/types";
+import { DISPOSE_REASONS } from "@/types";
+import type { Alert, DisposeReason } from "@/types";
 
 interface AlertCardProps {
   alert: Alert;
@@ -25,23 +29,45 @@ const typeIcon = {
   near_no_stop: Ban,
 };
 
+const reasonLabel: Record<DisposeReason, string> = {
+  driver_communicated: "已与司机沟通确认",
+  route_adjusted: "临时调整路线",
+  false_alarm: "误报，已核实无异常",
+  equipment_issue: "设备故障，已报修",
+  traffic_delay: "交通拥堵导致延误",
+  student_waited: "等待迟到学生",
+  other: "其他原因",
+};
+
 export default function AlertCard({ alert, variant = "active" }: AlertCardProps) {
   const [showResultForm, setShowResultForm] = useState(false);
+  const [reason, setReason] = useState<DisposeReason>("driver_communicated");
   const [result, setResult] = useState("");
-  const updateAlertStatus = useAppStore((s) => s.updateAlertStatus);
+  const [handler, setHandler] = useState("");
+
+  const startProcess = useAppStore((s) => s.startProcess);
+  const addContactLog = useAppStore((s) => s.addContactLog);
+  const resolveAlert = useAppStore((s) => s.resolveAlert);
+  const currentUser = useAppStore((s) => s.currentUser);
 
   const TypeIcon = typeIcon[alert.type];
   const isResolved = variant === "resolved" || alert.status === "resolved";
 
   const handleStartProcess = () => {
-    updateAlertStatus(alert.id, "processing", undefined, "王主任");
+    startProcess(alert.id);
+  };
+
+  const handleContacted = (method: "call" | "sms", note?: string) => {
+    addContactLog(alert.id, method, note);
   };
 
   const handleResolve = () => {
     if (result.trim()) {
-      updateAlertStatus(alert.id, "resolved", result, "王主任");
+      resolveAlert(alert.id, reason, result, handler.trim() || currentUser);
       setShowResultForm(false);
       setResult("");
+      setHandler("");
+      setReason("driver_communicated");
     }
   };
 
@@ -50,7 +76,7 @@ export default function AlertCard({ alert, variant = "active" }: AlertCardProps)
       className={`card-base p-5 transition-all duration-300 hover:shadow-xl ${
         !isResolved
           ? "border-2 border-accent-red/40 animate-border-flash bg-gradient-to-br from-accent-red/5 to-transparent"
-          : "opacity-80"
+          : "opacity-90"
       }`}
     >
       <div className="flex items-start justify-between mb-4">
@@ -98,23 +124,82 @@ export default function AlertCard({ alert, variant = "active" }: AlertCardProps)
         </div>
       </div>
 
-      {isResolved ? (
-        <div className="p-4 bg-accent-green/10 rounded-lg border border-accent-green/20">
+      {alert.contactLog.length > 0 && (
+        <div className="mb-4 p-3 bg-navy-900/40 rounded-lg border border-navy-700/50">
           <div className="flex items-center gap-2 mb-2">
-            <CheckCircle className="w-4 h-4 text-accent-green" />
-            <span className="text-sm font-medium text-accent-green">处理完成</span>
+            <History className="w-4 h-4 text-accent-blue" />
+            <span className="text-xs font-semibold text-navy-200">联系记录</span>
+            <span className="text-xs text-navy-500">({alert.contactLog.length}次)</span>
           </div>
-          <div className="text-xs text-navy-300 mb-1">处理人：{alert.handler}</div>
-          <div className="text-xs text-navy-300 mb-2">处理时间：{alert.handleTime}</div>
-          <div className="text-sm text-navy-100">{alert.handleResult}</div>
+          <div className="space-y-1.5">
+            {alert.contactLog.map((log) => (
+              <div key={log.id} className="flex items-start gap-2 text-xs">
+                {log.method === "call" ? (
+                  <PhoneCall className="w-3.5 h-3.5 text-accent-green flex-shrink-0 mt-0.5" />
+                ) : (
+                  <MessageSquare className="w-3.5 h-3.5 text-accent-blue flex-shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1">
+                  <span className="text-navy-300">
+                    {log.method === "call" ? "电话" : "短信"} · {log.timestamp}
+                  </span>
+                  {log.note && (
+                    <span className="text-navy-400 ml-1">— {log.note}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isResolved ? (
+        <div className="space-y-3">
+          <div className="p-4 bg-accent-green/10 rounded-lg border border-accent-green/20">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle className="w-4 h-4 text-accent-green" />
+              <span className="text-sm font-medium text-accent-green">处理完成</span>
+            </div>
+            <div className="space-y-2 text-xs">
+              <div className="flex items-start gap-2">
+                <span className="text-navy-400 w-20 flex-shrink-0">处置原因</span>
+                <span className="text-navy-100 font-medium">
+                  {alert.disposeReason ? reasonLabel[alert.disposeReason] : "未记录"}
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-navy-400 w-20 flex-shrink-0">处理结果</span>
+                <span className="text-navy-100">{alert.handleResult}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-navy-400 w-20 flex-shrink-0">处理人</span>
+                <span className="text-navy-200">{alert.handler}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-navy-400 w-20 flex-shrink-0">处理时间</span>
+                <span className="text-navy-200 font-mono">{alert.handleTime}</span>
+              </div>
+              {alert.processStartTime && (
+                <div className="flex items-start gap-2">
+                  <span className="text-navy-400 w-20 flex-shrink-0">开始处理</span>
+                  <span className="text-navy-200 font-mono">{alert.processStartTime}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       ) : (
         <>
           <div className="flex items-center gap-3 mb-3">
-            <button className="flex-1 btn-danger flex items-center justify-center gap-2">
-              <Phone className="w-4 h-4" />
-              联系司机 {alert.driverPhone}
-            </button>
+            <ContactButton
+              name={alert.driverName}
+              phone={alert.driverPhone}
+              busPlate={alert.busPlateNumber}
+              variant="danger"
+              label={`联系司机`}
+              onContacted={handleContacted}
+              className="flex-1"
+            />
             {alert.status === "pending" && (
               <button
                 onClick={handleStartProcess}
@@ -137,22 +222,59 @@ export default function AlertCard({ alert, variant = "active" }: AlertCardProps)
           )}
 
           {showResultForm && (
-            <div className="p-4 bg-navy-900/50 rounded-lg border border-navy-700/50 space-y-3 animate-fade-in">
+            <div className="p-4 bg-navy-900/50 rounded-lg border border-navy-700/50 space-y-4 animate-fade-in">
+              <div>
+                <span className="text-xs text-navy-400 mb-1.5 block">处置原因</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {DISPOSE_REASONS.map((r) => (
+                    <button
+                      key={r.value}
+                      onClick={() => setReason(r.value)}
+                      className={`px-3 py-2 rounded-lg text-xs font-medium transition-all text-left ${
+                        reason === r.value
+                          ? "bg-accent-blue/20 text-accent-blue border border-accent-blue/40"
+                          : "bg-navy-800/50 text-navy-300 hover:bg-navy-700 border border-transparent"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <label className="block">
-                <span className="text-xs text-navy-400 mb-1.5 block">处理结果</span>
+                <span className="text-xs text-navy-400 mb-1.5 block">处理结果备注</span>
                 <textarea
                   value={result}
                   onChange={(e) => setResult(e.target.value)}
                   className="input-base h-20 resize-none"
-                  placeholder="请填写处理结果..."
+                  placeholder="请详细填写处理结果..."
                 />
               </label>
+
+              <label className="block">
+                <span className="text-xs text-navy-400 mb-1.5 block">处理人</span>
+                <input
+                  type="text"
+                  value={handler}
+                  onChange={(e) => setHandler(e.target.value)}
+                  className="input-base"
+                  placeholder={currentUser}
+                />
+              </label>
+
+              <div className="flex items-center gap-2 text-xs text-navy-400">
+                <Clock className="w-3.5 h-3.5" />
+                处理时间将自动记录为提交时刻
+              </div>
+
               <div className="flex gap-2">
                 <button
                   onClick={handleResolve}
                   disabled={!result.trim()}
-                  className="flex-1 btn-success disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 btn-success disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
+                  <CheckCircle className="w-4 h-4" />
                   提交处理结果
                 </button>
                 <button

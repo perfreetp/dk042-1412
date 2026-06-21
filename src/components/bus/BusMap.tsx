@@ -1,22 +1,23 @@
-import { useAppStore } from "@/store";
-import type { Bus } from "@/types";
+import { useAppStore, calculateRisk } from "@/store";
+import { riskConfig } from "@/utils/risk";
+import type { Bus, RiskLevel } from "@/types";
 
 interface BusMapProps {
   onSelectBus: (bus: Bus) => void;
 }
 
-const statusAnimation = {
-  running: "animate-pulse-green",
-  stopped: "animate-pulse-green",
-  delay: "animate-pulse-yellow",
-  offline: "",
+const riskAnimation: Record<RiskLevel, string> = {
+  high: "animate-pulse-red",
+  medium: "animate-pulse-yellow",
+  low: "animate-pulse-green",
+  none: "animate-pulse-green",
 };
 
-const statusColor = {
-  running: "bg-accent-green",
-  stopped: "bg-accent-blue",
-  delay: "bg-accent-yellow",
-  offline: "bg-navy-500",
+const riskFillColor: Record<RiskLevel, string> = {
+  high: "#E63946",
+  medium: "#E9C46A",
+  low: "#457B9D",
+  none: "#2A9D8F",
 };
 
 const routePaths = [
@@ -36,9 +37,12 @@ const mapStops = [
 
 export default function BusMap({ onSelectBus }: BusMapProps) {
   const buses = useAppStore((s) => s.buses);
+  const alerts = useAppStore((s) => s.alerts);
   const filters = useAppStore((s) => s.filters);
 
   const filteredBuses = buses.filter((bus) => {
+    const risk = calculateRisk(bus, alerts);
+    if (filters.risk !== "all" && risk.level !== filters.risk) return false;
     if (filters.status !== "all" && bus.status !== filters.status) return false;
     if (filters.grade !== "all" && !bus.grades.includes(filters.grade)) return false;
     if (filters.route !== "all" && bus.routeId !== filters.route) return false;
@@ -104,46 +108,65 @@ export default function BusMap({ onSelectBus }: BusMapProps) {
             </g>
           ))}
 
-          {filteredBuses.map((bus) => (
-            <g
-              key={bus.id}
-              className="cursor-pointer"
-              onClick={() => onSelectBus(bus)}
-              transform={`translate(${bus.position.x * 8 + 100}, ${bus.position.y * 8})`}
-            >
-              <circle
-                r="18"
-                fill="transparent"
-                className={bus.status !== "offline" ? statusAnimation[bus.status] : ""}
-              />
-              <circle r="12" className={statusColor[bus.status]} stroke="white" strokeWidth="2" />
-              <text y="4" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">
-                🚌
-              </text>
-              <text
-                y="36"
-                textAnchor="middle"
-                fill="#E8EEF5"
-                fontSize="10"
-                fontWeight="600"
+          {filteredBuses.map((bus) => {
+            const risk = calculateRisk(bus, alerts);
+            const fillColor = riskFillColor[risk.level];
+            return (
+              <g
+                key={bus.id}
+                className="cursor-pointer"
+                onClick={() => onSelectBus(bus)}
+                transform={`translate(${bus.position.x * 8 + 100}, ${bus.position.y * 8})`}
               >
-                {bus.plateNumber.replace("沪A·", "")}
-              </text>
-            </g>
-          ))}
+                <circle
+                  r="20"
+                  fill="transparent"
+                  className={bus.status !== "offline" ? riskAnimation[risk.level] : ""}
+                  style={{ animationDuration: risk.level === "high" ? "0.8s" : "2s" }}
+                />
+                <circle
+                  r="13"
+                  fill={fillColor}
+                  stroke="white"
+                  strokeWidth="2.5"
+                  opacity={bus.status === "offline" ? 0.4 : 1}
+                />
+                <text y="4" textAnchor="middle" fill="white" fontSize="11" fontWeight="700">
+                  🚌
+                </text>
+                <text
+                  y="38"
+                  textAnchor="middle"
+                  fill="#E8EEF5"
+                  fontSize="10"
+                  fontWeight="600"
+                >
+                  {bus.plateNumber.replace("沪A·", "")}
+                </text>
+                {risk.level !== "none" && (
+                  <text y="52" textAnchor="middle" fill={fillColor} fontSize="9" fontWeight="700">
+                    {riskConfig[risk.level].label}
+                  </text>
+                )}
+              </g>
+            );
+          })}
         </svg>
 
         <div className="absolute top-3 right-3 flex flex-col gap-2">
           <div className="card-base p-3 space-y-2">
-            <div className="text-xs font-medium text-navy-300 mb-2">状态图例</div>
+            <div className="text-xs font-medium text-navy-300 mb-2">风险图例</div>
             {[
-              { c: "bg-accent-green", l: "运行中" },
-              { c: "bg-accent-blue", l: "已到站" },
-              { c: "bg-accent-yellow", l: "延迟" },
-              { c: "bg-navy-500", l: "离线" },
+              { c: "#E63946", l: "高风险" },
+              { c: "#E9C46A", l: "中风险" },
+              { c: "#457B9D", l: "低风险" },
+              { c: "#2A9D8F", l: "无风险" },
             ].map((item) => (
               <div key={item.l} className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded-full ${item.c}`} />
+                <span
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: item.c }}
+                />
                 <span className="text-xs text-navy-200">{item.l}</span>
               </div>
             ))}

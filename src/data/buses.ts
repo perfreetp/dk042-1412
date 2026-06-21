@@ -122,5 +122,6 @@ export const buses: Bus[] = [
     nextStop: { name: "待发车", eta: "--:--", etaMinutes: -1 },
     onboardStudents: [],
     lastUpdate: "2026-06-22 06:30:00",
+    offlineMinutes: 55,
   },
 ];

@@ -6,35 +6,70 @@ import {
   Clock,
   Filter,
   Search,
+  Flame,
 } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
 import BusMap from "@/components/bus/BusMap";
 import BusCard from "@/components/bus/BusCard";
 import BusDetailModal from "@/components/bus/BusDetailModal";
-import { useAppStore } from "@/store";
+import { useAppStore, calculateRisk } from "@/store";
 import { routes, grades } from "@/data/buses";
-import type { Bus as BusType, BusStatusFilter, GradeFilter, RouteFilter } from "@/types";
+import { riskConfig } from "@/utils/risk";
+import type {
+  Bus as BusType,
+  BusStatusFilter,
+  RiskFilter,
+  GradeFilter,
+  RouteFilter,
+} from "@/types";
+
+const riskOptions: { value: RiskFilter; label: string; color: string }[] = [
+  { value: "all", label: "全部风险", color: "text-navy-300" },
+  { value: "high", label: "高风险", color: "text-accent-red" },
+  { value: "medium", label: "中风险", color: "text-accent-yellow" },
+  { value: "low", label: "低风险", color: "text-accent-blue" },
+  { value: "none", label: "无风险", color: "text-accent-green" },
+];
 
 export default function Dashboard() {
   const buses = useAppStore((s) => s.buses);
   const alerts = useAppStore((s) => s.alerts);
   const filters = useAppStore((s) => s.filters);
   const setFilterStatus = useAppStore((s) => s.setFilterStatus);
+  const setFilterRisk = useAppStore((s) => s.setFilterRisk);
   const setFilterGrade = useAppStore((s) => s.setFilterGrade);
   const setFilterRoute = useAppStore((s) => s.setFilterRoute);
   const [selectedBus, setSelectedBus] = useState<BusType | null>(null);
   const [searchText, setSearchText] = useState("");
+
+  const busRisks = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof calculateRisk>>();
+    buses.forEach((b) => map.set(b.id, calculateRisk(b, alerts)));
+    return map;
+  }, [buses, alerts]);
 
   const stats = useMemo(() => {
     const running = buses.filter((b) => b.status === "running").length;
     const stopped = buses.filter((b) => b.status === "stopped").length;
     const offline = buses.filter((b) => b.status === "offline").length;
     const pendingAlerts = alerts.filter((a) => a.status === "pending").length;
-    return { running, stopped, offline, pendingAlerts, total: buses.length };
-  }, [buses, alerts]);
+    const highRisk = buses.filter(
+      (b) => busRisks.get(b.id)?.level === "high"
+    ).length;
+    return {
+      running,
+      stopped,
+      offline,
+      pendingAlerts,
+      highRisk,
+      total: buses.length,
+    };
+  }, [buses, alerts, busRisks]);
 
   const filteredBuses = useMemo(() => {
     return buses.filter((bus) => {
+      const risk = busRisks.get(bus.id);
+      if (filters.risk !== "all" && risk?.level !== filters.risk) return false;
       if (filters.status !== "all" && bus.status !== filters.status) return false;
       if (filters.grade !== "all" && !bus.grades.includes(filters.grade)) return false;
       if (filters.route !== "all" && bus.routeId !== filters.route) return false;
@@ -48,7 +83,7 @@ export default function Dashboard() {
       }
       return true;
     });
-  }, [buses, filters, searchText]);
+  }, [buses, filters, searchText, busRisks]);
 
   const statusOptions: { value: BusStatusFilter; label: string }[] = [
     { value: "all", label: "全部状态" },
@@ -57,6 +92,10 @@ export default function Dashboard() {
     { value: "delay", label: "延迟" },
     { value: "offline", label: "离线" },
   ];
+
+  const handleSelectBus = (bus: BusType) => {
+    setSelectedBus(bus);
+  };
 
   return (
     <div className="space-y-6">
@@ -76,25 +115,25 @@ export default function Dashboard() {
           trend={`总计 ${stats.total} 辆校车`}
         />
         <StatCard
-          title="已完成接送"
-          value={stats.stopped}
-          icon={CheckCircle}
-          color="blue"
-          trend="安全到校"
+          title="高风险车辆"
+          value={stats.highRisk}
+          icon={Flame}
+          color="red"
+          trend={stats.highRisk > 0 ? "需重点关注" : "当前无高风险"}
         />
         <StatCard
           title="异常告警"
           value={stats.pendingAlerts}
           icon={AlertTriangle}
-          color="red"
-          trend={stats.pendingAlerts > 0 ? "需要立即处理" : "当前无待处理告警"}
+          color="yellow"
+          trend={stats.pendingAlerts > 0 ? "需要处理" : "当前无待处理告警"}
         />
         <StatCard
-          title="离线车辆"
-          value={stats.offline}
-          icon={Clock}
-          color="yellow"
-          trend="待检查设备状态"
+          title="已完成接送"
+          value={stats.stopped}
+          icon={CheckCircle}
+          color="blue"
+          trend="安全到校"
         />
       </div>
 
@@ -116,10 +155,29 @@ export default function Dashboard() {
             />
           </div>
 
+          <div className="flex items-center gap-1.5 p-1 bg-navy-900/50 rounded-lg">
+            {riskOptions.map((opt) => {
+              const isActive = filters.risk === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setFilterRisk(opt.value)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    isActive
+                      ? "bg-navy-700 " + opt.color
+                      : "text-navy-400 hover:text-white hover:bg-navy-800/50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
           <select
             value={filters.status}
             onChange={(e) => setFilterStatus(e.target.value as BusStatusFilter)}
-            className="input-base w-36 py-2 text-sm appearance-none cursor-pointer"
+            className="input-base w-32 py-2 text-sm appearance-none cursor-pointer"
           >
             {statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -131,7 +189,7 @@ export default function Dashboard() {
           <select
             value={filters.route}
             onChange={(e) => setFilterRoute(e.target.value as RouteFilter)}
-            className="input-base w-48 py-2 text-sm appearance-none cursor-pointer"
+            className="input-base w-44 py-2 text-sm appearance-none cursor-pointer"
           >
             <option value="all">全部线路</option>
             {routes.map((r) => (
@@ -144,7 +202,7 @@ export default function Dashboard() {
           <select
             value={filters.grade}
             onChange={(e) => setFilterGrade(e.target.value as GradeFilter)}
-            className="input-base w-32 py-2 text-sm appearance-none cursor-pointer"
+            className="input-base w-28 py-2 text-sm appearance-none cursor-pointer"
           >
             <option value="all">全部年级</option>
             {grades.map((g) => (
@@ -158,6 +216,19 @@ export default function Dashboard() {
             共筛选出 <span className="text-white font-bold font-mono">{filteredBuses.length}</span> 辆校车
           </div>
         </div>
+
+        {filters.risk !== "all" && (
+          <div className="mt-3 pt-3 border-t border-navy-700/50 flex items-center gap-2 text-xs">
+            <Flame className="w-3.5 h-3.5 text-accent-yellow" />
+            <span className="text-navy-300">
+              已按
+              <span className={`font-bold mx-1 ${riskConfig[filters.risk as "high" | "medium" | "low" | "none"].text}`}>
+                {riskConfig[filters.risk as "high" | "medium" | "low" | "none"].label}
+              </span>
+              筛选，地图与列表已同步显示对应车辆
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-12 gap-6">
@@ -166,7 +237,7 @@ export default function Dashboard() {
             <h2 className="text-lg font-bold text-white">实时位置地图</h2>
             <span className="text-xs text-navy-400">点击车辆标记查看详情</span>
           </div>
-          <BusMap onSelectBus={setSelectedBus} />
+          <BusMap onSelectBus={handleSelectBus} />
         </div>
 
         <div className="col-span-5">
@@ -185,6 +256,7 @@ export default function Dashboard() {
                 <BusCard
                   key={bus.id}
                   bus={bus}
+                  risk={busRisks.get(bus.id)!}
                   selected={selectedBus?.id === bus.id}
                   onClick={() => setSelectedBus(bus)}
                 />
@@ -196,6 +268,7 @@ export default function Dashboard() {
 
       <BusDetailModal
         bus={selectedBus}
+        risk={selectedBus ? busRisks.get(selectedBus.id) : undefined}
         isOpen={!!selectedBus}
         onClose={() => setSelectedBus(null)}
       />

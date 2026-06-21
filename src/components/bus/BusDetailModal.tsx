@@ -1,19 +1,34 @@
-import { User, Users, Phone, MapPin, Clock, Route, CheckCircle2 } from "lucide-react";
+import {
+  User,
+  Users,
+  Phone,
+  MapPin,
+  Clock,
+  Route,
+  CheckCircle2,
+  AlertTriangle,
+  Shield,
+} from "lucide-react";
 import Modal from "@/components/common/Modal";
 import StatusBadge from "@/components/common/StatusBadge";
-import type { Bus } from "@/types";
+import { ContactButton } from "@/components/common/ContactDriverModal";
+import { riskConfig } from "@/utils/risk";
+import type { Bus, RiskInfo } from "@/types";
 import { useCountdown } from "@/hooks/useTimer";
 
 interface BusDetailModalProps {
   bus: Bus | null;
+  risk?: RiskInfo;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function BusDetailModal({ bus, isOpen, onClose }: BusDetailModalProps) {
+export default function BusDetailModal({ bus, risk, isOpen, onClose }: BusDetailModalProps) {
   const timeLeft = useCountdown(bus?.nextStop.etaMinutes || 0);
 
   if (!bus) return null;
+
+  const hasRisk = risk && risk.level !== "none";
 
   return (
     <Modal
@@ -24,6 +39,46 @@ export default function BusDetailModal({ bus, isOpen, onClose }: BusDetailModalP
     >
       <div className="grid grid-cols-3 gap-6">
         <div className="col-span-2 space-y-5">
+          {hasRisk && (
+            <div className="card-base p-4 border-l-4 bg-gradient-to-br from-accent-red/5 to-transparent animate-slide-in-right"
+              style={{ borderLeftColor: riskConfig[risk!.level].dot.replace("bg-", "").includes("red") ? "#E63946" : riskConfig[risk!.level].dot.replace("bg-", "").includes("yellow") ? "#E9C46A" : "#457B9D" }}
+            >
+              <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                <AlertTriangle className={`w-4 h-4 ${riskConfig[risk!.level].text}`} />
+                迟到风险来源
+                <span className={`ml-auto status-badge ${riskConfig[risk!.level].bg} ${riskConfig[risk!.level].text}`}>
+                  {riskConfig[risk!.level].label}
+                </span>
+              </h3>
+              <div className="space-y-2">
+                {risk!.factors.map((factor, idx) => (
+                  <div key={idx} className="flex items-start gap-2 p-2.5 bg-navy-900/40 rounded-lg">
+                    <AlertTriangle className={`w-4 h-4 flex-shrink-0 mt-0.5 ${riskConfig[factor.level].text}`} />
+                    <div className="flex-1">
+                      <div className={`text-sm font-semibold ${riskConfig[factor.level].text}`}>
+                        {factor.label}
+                      </div>
+                      <div className="text-xs text-navy-300 mt-0.5">{factor.description}</div>
+                    </div>
+                    <span className={`status-badge text-xs ${riskConfig[factor.level].bg} ${riskConfig[factor.level].text}`}>
+                      {riskConfig[factor.level].label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!hasRisk && (
+            <div className="card-base p-4 border-l-4 border-l-accent-green bg-gradient-to-br from-accent-green/5 to-transparent">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-accent-green" />
+                <span className="text-sm font-bold text-accent-green">当前无风险</span>
+                <span className="text-xs text-navy-400 ml-auto">车辆运行正常</span>
+              </div>
+            </div>
+          )}
+
           <div className="card-base p-4">
             <h3 className="text-sm font-bold text-navy-200 mb-4 flex items-center gap-2">
               <Route className="w-4 h-4 text-accent-blue" />
@@ -118,10 +173,14 @@ export default function BusDetailModal({ bus, isOpen, onClose }: BusDetailModalP
                 <div className="text-xs text-navy-400">主驾</div>
               </div>
             </div>
-            <button className="w-full btn-success flex items-center justify-center gap-2">
-              <Phone className="w-4 h-4" />
-              {bus.driver.phone}
-            </button>
+            <ContactButton
+              name={bus.driver.name}
+              phone={bus.driver.phone}
+              busPlate={bus.plateNumber}
+              variant="success"
+              label={`联系司机`}
+              className="w-full"
+            />
           </div>
 
           <div className="card-base p-4">
@@ -138,15 +197,24 @@ export default function BusDetailModal({ bus, isOpen, onClose }: BusDetailModalP
                 <div className="text-xs text-navy-400">照管员</div>
               </div>
             </div>
-            <button className="w-full btn-primary flex items-center justify-center gap-2">
-              <Phone className="w-4 h-4" />
-              {bus.attendant.phone}
-            </button>
+            <ContactButton
+              name={bus.attendant.name}
+              phone={bus.attendant.phone}
+              busPlate={bus.plateNumber}
+              variant="primary"
+              label={`联系照管员`}
+              className="w-full"
+            />
           </div>
 
           <div className="card-base p-4">
             <div className="text-xs text-navy-400 mb-2">数据最后更新</div>
             <div className="text-sm font-mono text-navy-200">{bus.lastUpdate}</div>
+            {bus.offlineMinutes && (
+              <div className="mt-2 text-xs text-accent-red">
+                离线时长：{bus.offlineMinutes} 分钟
+              </div>
+            )}
           </div>
         </div>
       </div>
