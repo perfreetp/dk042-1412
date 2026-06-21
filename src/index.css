@@ -1,0 +1,79 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Noto Sans SC", system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: #0f172a;
+  color: #e8eef5;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f3552;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #457b9d;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5c7eab;
+}
+
+@layer components {
+  .card-base {
+    @apply bg-navy-800/60 backdrop-blur-sm border border-navy-700/50 rounded-xl;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2.5 bg-accent-blue hover:bg-accent-blue/90 text-white font-medium rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-accent-blue/20 active:scale-[0.98];
+  }
+
+  .btn-danger {
+    @apply px-4 py-2.5 bg-accent-red hover:bg-accent-red/90 text-white font-medium rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-accent-red/20 active:scale-[0.98];
+  }
+
+  .btn-success {
+    @apply px-4 py-2.5 bg-accent-green hover:bg-accent-green/90 text-white font-medium rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-accent-green/20 active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2.5 bg-navy-700 hover:bg-navy-600 text-navy-100 font-medium rounded-lg transition-all duration-200 border border-navy-600;
+  }
+
+  .input-base {
+    @apply w-full px-4 py-2.5 bg-navy-900/50 border border-navy-600 rounded-lg text-navy-100 placeholder-navy-400 focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/30 transition-all;
+  }
+
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 text-navy-200 hover:text-white hover:bg-navy-800/60 rounded-lg transition-all duration-200 cursor-pointer;
+  }
+
+  .nav-item-active {
+    @apply bg-gradient-to-r from-accent-blue/20 to-transparent text-white border-l-2 border-accent-blue;
+  }
+}
