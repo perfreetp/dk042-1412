@@ -69,6 +69,13 @@ export function calculateRisk(bus: Bus, alerts: Alert[]): RiskInfo {
         description: alert.description,
         level: alert.level === "high" ? "high" : "medium",
       });
+    } else if (alert.type === "near_no_stop") {
+      factors.push({
+        type: "near_no_stop",
+        label: "接近禁停区",
+        description: alert.description,
+        level: "low",
+      });
     }
   });
 

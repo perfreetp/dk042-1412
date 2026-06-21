@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   ClipboardCheck,
   CheckCircle2,
@@ -28,6 +28,7 @@ export default function Preparation() {
   const shifts = useAppStore((s) => s.shifts);
   const toggleDriverConfirm = useAppStore((s) => s.toggleDriverConfirm);
   const sendReminder = useAppStore((s) => s.sendReminder);
+  const ensureShiftChecks = useAppStore((s) => s.ensureShiftChecks);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const [activeShiftType, setActiveShiftType] = useState<ShiftType>("afternoon");
   const [showShiftConfig, setShowShiftConfig] = useState(false);
@@ -36,6 +37,10 @@ export default function Preparation() {
 
   const activeShift = shifts.find((s) => s.type === activeShiftType)!;
   const activeChecks = checks.filter((c) => c.shiftId === activeShift.id);
+
+  useEffect(() => {
+    ensureShiftChecks(activeShift.id);
+  }, [activeShift.id, ensureShiftChecks]);
 
   const stats = useMemo(() => {
     const online = activeChecks.filter((c) => c.isOnline).length;
@@ -353,15 +358,24 @@ export default function Preparation() {
                           key={c.busId}
                           onClick={() => setSelectedBusId(isExpanded ? null : c.busId)}
                           className={`border-b border-navy-700/30 hover:bg-navy-800/30 cursor-pointer transition-colors ${
-                            (!c.isOnline || !c.isGpsNormal || !c.isDriverConfirmed)
+                            !c.hasCheckRecord
+                              ? "bg-accent-yellow/10"
+                              : !c.isOnline || !c.isGpsNormal || !c.isDriverConfirmed
                               ? "bg-accent-red/5"
                               : ""
                           }`}
                         >
                           <td className="px-5 py-4">
-                            <span className="text-sm font-bold text-white font-mono">
-                              {c.busPlateNumber}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-white font-mono">
+                                {c.busPlateNumber}
+                              </span>
+                              {!c.hasCheckRecord && (
+                                <span className="px-1.5 py-0.5 bg-accent-yellow/20 text-accent-yellow text-[10px] rounded font-bold">
+                                  无检查记录
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-5 py-4">
                             <span className="text-sm text-navy-200">{c.driverName}</span>
@@ -393,7 +407,7 @@ export default function Preparation() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  toggleDriverConfirm(c.busId);
+                                  toggleDriverConfirm(c.busId, activeShift.id);
                                 }}
                                 className={`p-2 rounded-lg transition-colors ${
                                   c.isDriverConfirmed
@@ -411,7 +425,7 @@ export default function Preparation() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  sendReminder(c.busId);
+                                  sendReminder(c.busId, activeShift.id);
                                 }}
                                 className="p-2 rounded-lg bg-navy-700 text-navy-300 hover:bg-accent-blue/20 hover:text-accent-blue transition-colors"
                                 title="发送提醒"
@@ -421,9 +435,10 @@ export default function Preparation() {
                               <ContactButton
                                 name={c.driverName}
                                 phone={c.driverPhone}
+                                phoneFull={c.driverPhoneFull}
                                 busPlate={c.busPlateNumber}
                                 variant="icon"
-                                onContacted={() => sendReminder(c.busId)}
+                                onContacted={() => sendReminder(c.busId, activeShift.id)}
                               />
                             </div>
                           </td>
@@ -448,7 +463,7 @@ export default function Preparation() {
                                 </div>
                                 <div className="flex gap-2">
                                   <button
-                                    onClick={() => toggleDriverConfirm(c.busId)}
+                                    onClick={() => toggleDriverConfirm(c.busId, activeShift.id)}
                                     className={c.isDriverConfirmed ? "btn-secondary" : "btn-success"}
                                   >
                                     {c.isDriverConfirmed ? "取消确认" : "标记司机已确认"}
@@ -456,10 +471,11 @@ export default function Preparation() {
                                   <ContactButton
                                     name={c.driverName}
                                     phone={c.driverPhone}
+                                    phoneFull={c.driverPhoneFull}
                                     busPlate={c.busPlateNumber}
                                     variant="primary"
                                     label="联系司机"
-                                    onContacted={() => sendReminder(c.busId)}
+                                    onContacted={() => sendReminder(c.busId, activeShift.id)}
                                   />
                                 </div>
                               </div>

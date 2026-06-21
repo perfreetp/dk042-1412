@@ -10,6 +10,8 @@ import type {
   RouteFilter,
   ContactLogEntry,
   DisposeReason,
+  TimelineEvent,
+  TimelineEventType,
 } from "@/types";
 import { buses as mockBuses } from "@/data/buses";
 import { alerts as mockAlerts, resolvedAlerts as mockResolvedAlerts } from "@/data/alerts";
@@ -44,6 +46,14 @@ interface AppState {
 
   startProcess: (alertId: string) => void;
   addContactLog: (alertId: string, method: "call" | "sms", note?: string) => void;
+  addTimelineEvent: (
+    alertId: string,
+    type: TimelineEventType,
+    title: string,
+    description: string,
+    operator?: string
+  ) => void;
+  addDriverReply: (alertId: string, content: string) => void;
   resolveAlert: (
     alertId: string,
     reason: DisposeReason,
@@ -51,9 +61,10 @@ interface AppState {
     handler: string
   ) => void;
 
-  toggleDriverConfirm: (busId: string) => void;
-  sendReminder: (busId: string) => void;
+  toggleDriverConfirm: (busId: string, shiftId?: string) => void;
+  sendReminder: (busId: string, shiftId?: string) => void;
   setActiveShiftId: (shiftId: string) => void;
+  ensureShiftChecks: (shiftId: string) => void;
 
   updateCurrentTime: () => void;
 }
@@ -119,10 +130,19 @@ export const useAppStore = create<AppState>((set) => ({
         id: `cl_${Date.now()}`,
         method,
         target:
-          state.alerts.find((a) => a.id === alertId)?.driverPhone ?? "",
+          state.alerts.find((a) => a.id === alertId)?.driverPhoneFull ?? "",
         operator: state.currentUser,
         timestamp: nowString(),
         note,
+        direction: "outbound",
+      };
+      const timelineEvent: TimelineEvent = {
+        id: `tl_${Date.now()}`,
+        type: "operator_contact",
+        title: `${state.currentUser}${method === "call" ? "拨打电话" : "发送短信"}`,
+        description: note || `联系司机 ${state.alerts.find((a) => a.id === alertId)?.driverName}`,
+        operator: state.currentUser,
+        timestamp: nowString(),
       };
       return {
         alerts: state.alerts.map((a) =>
@@ -133,9 +153,68 @@ export const useAppStore = create<AppState>((set) => ({
                 handler: a.handler ?? state.currentUser,
                 processStartTime: a.processStartTime ?? nowString(),
                 contactLog: [...a.contactLog, entry],
+                timeline: [...a.timeline, timelineEvent],
               }
             : a
         ),
+      };
+    }),
+
+  addTimelineEvent: (alertId, type, title, description, operator) =>
+    set((state) => {
+      const event: TimelineEvent = {
+        id: `tl_${Date.now()}`,
+        type,
+        title,
+        description,
+        operator: operator ?? state.currentUser,
+        timestamp: nowString(),
+      };
+      const findAndUpdate = (alerts: Alert[]) =>
+        alerts.map((a) =>
+          a.id === alertId ? { ...a, timeline: [...a.timeline, event] } : a
+        );
+      return {
+        alerts: findAndUpdate(state.alerts),
+        resolvedAlerts: findAndUpdate(state.resolvedAlerts),
+      };
+    }),
+
+  addDriverReply: (alertId, content) =>
+    set((state) => {
+      const alert =
+        state.alerts.find((a) => a.id === alertId) ||
+        state.resolvedAlerts.find((a) => a.id === alertId);
+      const contactEntry: ContactLogEntry = {
+        id: `cl_${Date.now()}_reply`,
+        method: "call",
+        target: alert?.driverPhoneFull ?? "",
+        operator: alert?.driverName ?? "司机",
+        timestamp: nowString(),
+        note: content,
+        direction: "inbound",
+      };
+      const timelineEvent: TimelineEvent = {
+        id: `tl_${Date.now()}_reply`,
+        type: "driver_reply",
+        title: "司机回复",
+        description: content,
+        operator: `${alert?.driverName || "司机"}（司机）`,
+        timestamp: nowString(),
+      };
+      const findAndUpdate = (alerts: Alert[]) =>
+        alerts.map((a) =>
+          a.id === alertId
+            ? {
+                ...a,
+                contactLog: [...a.contactLog, contactEntry],
+                timeline: [...a.timeline, timelineEvent],
+              }
+            : a
+        );
+      return {
+        alerts: findAndUpdate(state.alerts),
+        resolvedAlerts: findAndUpdate(state.resolvedAlerts),
       };
     }),
 
@@ -143,6 +222,14 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => {
       const alert = state.alerts.find((a) => a.id === alertId);
       if (!alert) return state;
+      const resolveEvent: TimelineEvent = {
+        id: `tl_${Date.now()}_resolved`,
+        type: "alert_resolved",
+        title: "告警解除",
+        description: result,
+        operator: handler || alert.handler || state.currentUser,
+        timestamp: nowString(),
+      };
       const resolved: Alert = {
         ...alert,
         status: "resolved",
@@ -150,6 +237,7 @@ export const useAppStore = create<AppState>((set) => ({
         handleResult: result,
         handler: handler || alert.handler || state.currentUser,
         handleTime: nowString(),
+        timeline: [...alert.timeline, resolveEvent],
       };
       return {
         alerts: state.alerts.filter((a) => a.id !== alertId),
@@ -157,32 +245,82 @@ export const useAppStore = create<AppState>((set) => ({
       };
     }),
 
-  toggleDriverConfirm: (busId) =>
-    set((state) => ({
-      preparationChecks: state.preparationChecks.map((c) =>
-        c.busId === busId
-          ? {
-              ...c,
-              isDriverConfirmed: !c.isDriverConfirmed,
-              confirmTime: !c.isDriverConfirmed ? nowTime() : undefined,
-            }
-          : c
-      ),
-    })),
+  toggleDriverConfirm: (busId, shiftId) =>
+    set((state) => {
+      const targetShiftId = shiftId || state.activeShiftId;
+      return {
+        preparationChecks: state.preparationChecks.map((c) =>
+          c.busId === busId && c.shiftId === targetShiftId
+            ? {
+                ...c,
+                isDriverConfirmed: !c.isDriverConfirmed,
+                confirmTime: !c.isDriverConfirmed ? nowTime() : undefined,
+              }
+            : c
+        ),
+      };
+    }),
 
-  sendReminder: (busId) =>
-    set((state) => ({
-      preparationChecks: state.preparationChecks.map((c) =>
-        c.busId === busId
-          ? {
-              ...c,
-              remark: `已发送提醒 ${nowTime()}`,
-            }
-          : c
-      ),
-    })),
+  sendReminder: (busId, shiftId) =>
+    set((state) => {
+      const targetShiftId = shiftId || state.activeShiftId;
+      return {
+        preparationChecks: state.preparationChecks.map((c) =>
+          c.busId === busId && c.shiftId === targetShiftId
+            ? {
+                ...c,
+                remark: `已发送提醒 ${nowTime()}`,
+              }
+            : c
+        ),
+      };
+    }),
 
-  setActiveShiftId: (shiftId) => set({ activeShiftId: shiftId }),
+  ensureShiftChecks: (shiftId) =>
+    set((state) => {
+      const shift = state.shifts.find((s) => s.id === shiftId);
+      if (!shift) return state;
+      const existingChecks = state.preparationChecks.filter(
+        (c) => c.shiftId === shiftId
+      );
+      const existingBusIds = new Set(existingChecks.map((c) => c.busId));
+      const missingChecks: PreparationCheck[] = [];
+      shift.busIds.forEach((busId) => {
+        if (!existingBusIds.has(busId)) {
+          const bus = state.buses.find((b) => b.id === busId);
+          if (bus) {
+            missingChecks.push({
+              busId: bus.id,
+              busPlateNumber: bus.plateNumber,
+              driverName: bus.driver.name,
+              driverPhone: bus.driver.phone,
+              driverPhoneFull: bus.driver.phoneFull,
+              routeName: bus.routeName,
+              shiftId: shiftId,
+              isOnline: false,
+              isGpsNormal: false,
+              isDriverConfirmed: false,
+              hasCheckRecord: false,
+              remark: "无检查记录，请及时核实",
+            });
+          }
+        }
+      });
+      if (missingChecks.length > 0) {
+        return {
+          preparationChecks: [...state.preparationChecks, ...missingChecks],
+        };
+      }
+      return state;
+    }),
+
+  setActiveShiftId: (shiftId) => {
+    set({ activeShiftId: shiftId });
+    set((state) => {
+      state.ensureShiftChecks(shiftId);
+      return state;
+    });
+  },
 
   updateCurrentTime: () => set({ currentTime: nowTime() }),
 }));

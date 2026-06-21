@@ -1,4 +1,8 @@
-import type { Alert } from "@/types";
+import type { Alert, TimelineEvent } from "@/types";
+
+const makeTimeline = (events: Omit<TimelineEvent, "id">[]): TimelineEvent[] => {
+  return events.map((e, i) => ({ ...e, id: `tl_${Date.now()}_${i}` }));
+};
 
 export const alerts: Alert[] = [
   {
@@ -7,6 +11,7 @@ export const alerts: Alert[] = [
     busPlateNumber: "沪A·34567",
     driverName: "李明华",
     driverPhone: "138****3456",
+    driverPhoneFull: "13803453456",
     type: "route_deviation",
     typeName: "路线偏离",
     level: "high",
@@ -15,6 +20,14 @@ export const alerts: Alert[] = [
     timestamp: "2026-06-22 07:18:22",
     status: "pending",
     contactLog: [],
+    timeline: makeTimeline([
+      {
+        type: "alert_created",
+        title: "系统检测到路线偏离",
+        description: "车辆偏离规定路线约800米，系统自动触发告警",
+        timestamp: "2026-06-22 07:18:22",
+      },
+    ]),
   },
   {
     id: "a002",
@@ -22,6 +35,7 @@ export const alerts: Alert[] = [
     busPlateNumber: "沪A·67890",
     driverName: "陈卫东",
     driverPhone: "138****6789",
+    driverPhoneFull: "13806786789",
     type: "long_stop",
     typeName: "长时间停留",
     level: "medium",
@@ -37,8 +51,24 @@ export const alerts: Alert[] = [
         operator: "王主任",
         timestamp: "2026-06-22 07:12:00",
         note: "电话无人接听，已留言",
+        direction: "outbound",
       },
     ],
+    timeline: makeTimeline([
+      {
+        type: "alert_created",
+        title: "系统检测到长时间停留",
+        description: "车辆在绿城花园小区内停留超过15分钟未移动",
+        timestamp: "2026-06-22 07:05:40",
+      },
+      {
+        type: "operator_contact",
+        title: "王主任发起联系",
+        description: "拨打司机电话138****6789，无人接听，已留言请尽快回复",
+        operator: "王主任",
+        timestamp: "2026-06-22 07:12:00",
+      },
+    ]),
     handler: "王主任",
     processStartTime: "2026-06-22 07:12:00",
   },
@@ -48,6 +78,7 @@ export const alerts: Alert[] = [
     busPlateNumber: "沪A·12345",
     driverName: "张建国",
     driverPhone: "138****1234",
+    driverPhoneFull: "13801231234",
     type: "near_no_stop",
     typeName: "接近禁停区域",
     level: "low",
@@ -56,6 +87,14 @@ export const alerts: Alert[] = [
     timestamp: "2026-06-22 07:22:15",
     status: "pending",
     contactLog: [],
+    timeline: makeTimeline([
+      {
+        type: "alert_created",
+        title: "接近禁停区域提示",
+        description: "车辆距离禁停区域还有50米，请注意绕行",
+        timestamp: "2026-06-22 07:22:15",
+      },
+    ]),
   },
 ];
 
@@ -66,6 +105,7 @@ export const resolvedAlerts: Alert[] = [
     busPlateNumber: "沪A·23456",
     driverName: "王志强",
     driverPhone: "138****2345",
+    driverPhoneFull: "13802342345",
     type: "long_stop",
     typeName: "长时间停留",
     level: "low",
@@ -81,8 +121,47 @@ export const resolvedAlerts: Alert[] = [
         operator: "李主任",
         timestamp: "2026-06-22 06:58:00",
         note: "司机接听，说明在等待迟到学生",
+        direction: "outbound",
+      },
+      {
+        id: "cl2_reply",
+        method: "call",
+        target: "138****2345",
+        operator: "王志强",
+        timestamp: "2026-06-22 06:58:30",
+        note: "司机回复：3名学生迟到，已电话联系家长，正在等候",
+        direction: "inbound",
       },
     ],
+    timeline: makeTimeline([
+      {
+        type: "alert_created",
+        title: "系统检测到长时间停留",
+        description: "车辆在人民广场站停留超过10分钟未移动",
+        timestamp: "2026-06-22 06:55:30",
+      },
+      {
+        type: "operator_contact",
+        title: "李主任联系司机",
+        description: "拨打司机电话138****2345，询问停留原因",
+        operator: "李主任",
+        timestamp: "2026-06-22 06:58:00",
+      },
+      {
+        type: "driver_reply",
+        title: "司机回复",
+        description: "3名学生迟到，已电话联系家长，正在等候，预计5分钟后发车",
+        operator: "王志强（司机）",
+        timestamp: "2026-06-22 06:58:30",
+      },
+      {
+        type: "alert_resolved",
+        title: "告警解除",
+        description: "学生已上车，车辆正常发车上路，本次停留原因核实为等待迟到学生",
+        operator: "李主任",
+        timestamp: "2026-06-22 07:02:15",
+      },
+    ]),
     handler: "李主任",
     disposeReason: "student_waited",
     handleResult: "司机解释为等待迟到学生3名，已正常发车",
@@ -95,6 +174,7 @@ export const resolvedAlerts: Alert[] = [
     busPlateNumber: "沪A·45678",
     driverName: "赵德胜",
     driverPhone: "138****4567",
+    driverPhoneFull: "13804564567",
     type: "route_deviation",
     typeName: "路线偏离",
     level: "medium",
@@ -110,6 +190,7 @@ export const resolvedAlerts: Alert[] = [
         operator: "王主任",
         timestamp: "2026-06-22 06:48:00",
         note: "发送短信询问绕行原因",
+        direction: "outbound",
       },
       {
         id: "cl4",
@@ -118,8 +199,68 @@ export const resolvedAlerts: Alert[] = [
         operator: "王主任",
         timestamp: "2026-06-22 06:50:00",
         note: "司机回复前方道路施工临时改道",
+        direction: "outbound",
+      },
+      {
+        id: "cl4_reply",
+        method: "call",
+        target: "138****4567",
+        operator: "赵德胜",
+        timestamp: "2026-06-22 06:50:30",
+        note: "司机回复：学府路施工封闭，已走科技路绕行，预计延误10分钟",
+        direction: "inbound",
       },
     ],
+    timeline: makeTimeline([
+      {
+        type: "alert_created",
+        title: "系统检测到路线偏离",
+        description: "车辆离开预设路线，往科技路方向行驶",
+        timestamp: "2026-06-22 06:45:00",
+      },
+      {
+        type: "operator_contact",
+        title: "王主任发送短信",
+        description: "发送短信询问绕行原因，请司机尽快回复",
+        operator: "王主任",
+        timestamp: "2026-06-22 06:48:00",
+      },
+      {
+        type: "operator_contact",
+        title: "王主任拨打电话",
+        description: "拨打司机电话138****4567确认情况",
+        operator: "王主任",
+        timestamp: "2026-06-22 06:50:00",
+      },
+      {
+        type: "driver_reply",
+        title: "司机回复",
+        description: "学府路施工封闭，已走科技路绕行，预计延误10分钟，已通知照管员",
+        operator: "赵德胜（司机）",
+        timestamp: "2026-06-22 06:50:30",
+      },
+      {
+        type: "route_replanned",
+        title: "重新规划路线",
+        description: "系统已更新绕行路线，同步通知后续站点家长",
+        operator: "系统",
+        timestamp: "2026-06-22 06:51:00",
+      },
+      {
+        type: "note_added",
+        title: "添加备注",
+        description: "已电话告知沿线站点学生家长预计延误10分钟，请耐心等候",
+        operator: "王主任",
+        timestamp: "2026-06-22 06:52:00",
+      },
+      {
+        type: "alert_resolved",
+        title: "告警解除",
+        description: "改道原因核实为道路施工，司机已按新路线正常行驶，家长已通知到位",
+        operator: "王主任",
+        timestamp: "2026-06-22 06:52:30",
+      },
+    ]),
     handler: "王主任",
     disposeReason: "route_adjusted",
     handleResult: "道路施工临时改道，已告知照管员并重新规划路线",

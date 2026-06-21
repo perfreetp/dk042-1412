@@ -24,7 +24,7 @@ export type BusStatus = "running" | "stopped" | "offline" | "delay";
 export type RiskLevel = "none" | "low" | "medium" | "high";
 
 export interface RiskFactor {
-  type: "late_arrival" | "offline_long" | "next_stop_abnormal" | "route_deviation" | "long_stop";
+  type: "late_arrival" | "offline_long" | "next_stop_abnormal" | "route_deviation" | "long_stop" | "near_no_stop";
   label: string;
   description: string;
   level: RiskLevel;
@@ -35,16 +35,35 @@ export interface RiskInfo {
   factors: RiskFactor[];
 }
 
+export interface Stop {
+  id: string;
+  name: string;
+  completed: boolean;
+  completeTime?: string;
+  studentsToPick?: number;
+}
+
+export interface ShiftProgress {
+  shiftId: string;
+  totalStops: number;
+  completedStops: number;
+  pendingStudents: number;
+  pickedStudents: number;
+  stops: Stop[];
+}
+
 export interface Bus {
   id: string;
   plateNumber: string;
   driver: {
     name: string;
     phone: string;
+    phoneFull: string;
   };
   attendant: {
     name: string;
     phone: string;
+    phoneFull: string;
   };
   routeId: string;
   routeName: string;
@@ -57,6 +76,8 @@ export interface Bus {
   onboardStudents: Student[];
   lastUpdate: string;
   offlineMinutes?: number;
+  morningProgress?: ShiftProgress;
+  afternoonProgress?: ShiftProgress;
 }
 
 export interface Route {
@@ -69,6 +90,24 @@ export type AlertType = "route_deviation" | "long_stop" | "near_no_stop";
 export type AlertLevel = "high" | "medium" | "low";
 export type AlertStatus = "pending" | "processing" | "resolved";
 
+export type TimelineEventType =
+  | "alert_created"
+  | "operator_contact"
+  | "driver_reply"
+  | "route_replanned"
+  | "alert_resolved"
+  | "note_added";
+
+export interface TimelineEvent {
+  id: string;
+  type: TimelineEventType;
+  title: string;
+  description: string;
+  operator?: string;
+  timestamp: string;
+  icon?: string;
+}
+
 export interface ContactLogEntry {
   id: string;
   method: "call" | "sms";
@@ -76,6 +115,7 @@ export interface ContactLogEntry {
   operator: string;
   timestamp: string;
   note?: string;
+  direction?: "outbound" | "inbound";
 }
 
 export type DisposeReason =
@@ -93,6 +133,7 @@ export interface Alert {
   busPlateNumber: string;
   driverName: string;
   driverPhone: string;
+  driverPhoneFull: string;
   type: AlertType;
   typeName: string;
   level: AlertLevel;
@@ -101,6 +142,7 @@ export interface Alert {
   timestamp: string;
   status: AlertStatus;
   contactLog: ContactLogEntry[];
+  timeline: TimelineEvent[];
   handler?: string;
   disposeReason?: DisposeReason;
   handleResult?: string;
@@ -123,6 +165,7 @@ export interface PreparationCheck {
   busPlateNumber: string;
   driverName: string;
   driverPhone: string;
+  driverPhoneFull: string;
   routeName: string;
   shiftId: string;
   isOnline: boolean;
@@ -130,6 +173,7 @@ export interface PreparationCheck {
   isDriverConfirmed: boolean;
   confirmTime?: string;
   remark?: string;
+  hasCheckRecord: boolean;
 }
 
 export type BusStatusFilter = "all" | "running" | "stopped" | "delay" | "offline";

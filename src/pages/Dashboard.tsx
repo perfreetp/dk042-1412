@@ -7,11 +7,16 @@ import {
   Filter,
   Search,
   Flame,
+  LayoutGrid,
+  Map as MapIcon,
+  Sunrise,
+  Sunset,
 } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
 import BusMap from "@/components/bus/BusMap";
 import BusCard from "@/components/bus/BusCard";
 import BusDetailModal from "@/components/bus/BusDetailModal";
+import ShiftProgressView from "@/components/dashboard/ShiftProgressView";
 import { useAppStore, calculateRisk } from "@/store";
 import { routes, grades } from "@/data/buses";
 import { riskConfig } from "@/utils/risk";
@@ -21,7 +26,10 @@ import type {
   RiskFilter,
   GradeFilter,
   RouteFilter,
+  ShiftType,
 } from "@/types";
+
+type ViewMode = "map" | "progress";
 
 const riskOptions: { value: RiskFilter; label: string; color: string }[] = [
   { value: "all", label: "全部风险", color: "text-navy-300" },
@@ -41,6 +49,8 @@ export default function Dashboard() {
   const setFilterRoute = useAppStore((s) => s.setFilterRoute);
   const [selectedBus, setSelectedBus] = useState<BusType | null>(null);
   const [searchText, setSearchText] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("map");
+  const [activeShiftType, setActiveShiftType] = useState<ShiftType>("morning");
 
   const busRisks = useMemo(() => {
     const map = new Map<string, ReturnType<typeof calculateRisk>>();
@@ -144,35 +154,89 @@ export default function Dashboard() {
             <span className="text-sm text-navy-300 font-medium">筛选：</span>
           </div>
 
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-navy-500" />
-            <input
-              type="text"
-              placeholder="搜索车牌/司机/线路..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="input-base pl-9 w-56 py-2 text-sm"
-            />
+          <div className="flex items-center gap-1 p-1 bg-navy-900/50 rounded-lg">
+            <button
+              onClick={() => setViewMode("map")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                viewMode === "map"
+                  ? "bg-navy-700 text-white"
+                  : "text-navy-400 hover:text-white hover:bg-navy-800/50"
+              }`}
+            >
+              <MapIcon className="w-4 h-4" />
+              地图视图
+            </button>
+            <button
+              onClick={() => setViewMode("progress")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                viewMode === "progress"
+                  ? "bg-navy-700 text-white"
+                  : "text-navy-400 hover:text-white hover:bg-navy-800/50"
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              班次进度
+            </button>
           </div>
 
-          <div className="flex items-center gap-1.5 p-1 bg-navy-900/50 rounded-lg">
-            {riskOptions.map((opt) => {
-              const isActive = filters.risk === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => setFilterRisk(opt.value)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    isActive
-                      ? "bg-navy-700 " + opt.color
-                      : "text-navy-400 hover:text-white hover:bg-navy-800/50"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+          {viewMode === "progress" && (
+            <div className="flex items-center gap-1 p-1 bg-navy-900/50 rounded-lg">
+              <button
+                onClick={() => setActiveShiftType("morning")}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                  activeShiftType === "morning"
+                    ? "bg-accent-yellow/20 text-accent-yellow"
+                    : "text-navy-400 hover:text-white hover:bg-navy-800/50"
+                }`}
+              >
+                <Sunrise className="w-4 h-4" />
+                早送
+              </button>
+              <button
+                onClick={() => setActiveShiftType("afternoon")}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                  activeShiftType === "afternoon"
+                    ? "bg-accent-blue/20 text-accent-blue"
+                    : "text-navy-400 hover:text-white hover:bg-navy-800/50"
+                }`}
+              >
+                <Sunset className="w-4 h-4" />
+                晚接
+              </button>
+            </div>
+          )}
+
+          {viewMode === "map" && (
+            <>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-navy-500" />
+                <input
+                  type="text"
+                  placeholder="搜索车牌/司机/线路..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="input-base pl-9 w-56 py-2 text-sm"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 p-1 bg-navy-900/50 rounded-lg">
+                {riskOptions.map((opt) => {
+                  const isActive = filters.risk === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => setFilterRisk(opt.value)}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                        isActive
+                          ? "bg-navy-700 " + opt.color
+                          : "text-navy-400 hover:text-white hover:bg-navy-800/50"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
 
           <select
             value={filters.status}
@@ -215,9 +279,11 @@ export default function Dashboard() {
           <div className="ml-auto text-sm text-navy-400">
             共筛选出 <span className="text-white font-bold font-mono">{filteredBuses.length}</span> 辆校车
           </div>
+            </>
+          )}
         </div>
 
-        {filters.risk !== "all" && (
+        {filters.risk !== "all" && viewMode === "map" && (
           <div className="mt-3 pt-3 border-t border-navy-700/50 flex items-center gap-2 text-xs">
             <Flame className="w-3.5 h-3.5 text-accent-yellow" />
             <span className="text-navy-300">
@@ -231,44 +297,49 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-7">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-bold text-white">实时位置地图</h2>
-            <span className="text-xs text-navy-400">点击车辆标记查看详情</span>
+      {viewMode === "map" ? (
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-7">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-white">实时位置地图</h2>
+              <span className="text-xs text-navy-400">点击车辆标记查看详情</span>
+            </div>
+            <BusMap onSelectBus={handleSelectBus} />
           </div>
-          <BusMap onSelectBus={handleSelectBus} />
-        </div>
 
-        <div className="col-span-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-bold text-white">车辆列表</h2>
-            <span className="text-xs text-navy-400">共 {filteredBuses.length} 辆</span>
-          </div>
-          <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
-            {filteredBuses.length === 0 ? (
-              <div className="card-base p-8 text-center">
-                <Bus className="w-10 h-10 mx-auto text-navy-600 mb-2" />
-                <p className="text-navy-500">没有符合条件的校车</p>
-              </div>
-            ) : (
-              filteredBuses.map((bus) => (
-                <BusCard
-                  key={bus.id}
-                  bus={bus}
-                  risk={busRisks.get(bus.id)!}
-                  selected={selectedBus?.id === bus.id}
-                  onClick={() => setSelectedBus(bus)}
-                />
-              ))
-            )}
+          <div className="col-span-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-white">车辆列表</h2>
+              <span className="text-xs text-navy-400">共 {filteredBuses.length} 辆</span>
+            </div>
+            <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
+              {filteredBuses.length === 0 ? (
+                <div className="card-base p-8 text-center">
+                  <Bus className="w-10 h-10 mx-auto text-navy-600 mb-2" />
+                  <p className="text-navy-500">没有符合条件的校车</p>
+                </div>
+              ) : (
+                filteredBuses.map((bus) => (
+                  <BusCard
+                    key={bus.id}
+                    bus={bus}
+                    risk={busRisks.get(bus.id)!}
+                    selected={selectedBus?.id === bus.id}
+                    onClick={() => setSelectedBus(bus)}
+                  />
+                ))
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <ShiftProgressView shiftType={activeShiftType} />
+      )}
 
       <BusDetailModal
         bus={selectedBus}
         risk={selectedBus ? busRisks.get(selectedBus.id) : undefined}
+        shiftType={activeShiftType}
         isOpen={!!selectedBus}
         onClose={() => setSelectedBus(null)}
       />

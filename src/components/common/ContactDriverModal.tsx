@@ -7,6 +7,7 @@ interface ContactDriverModalProps {
   onClose: () => void;
   name: string;
   phone: string;
+  phoneFull: string;
   busPlate?: string;
   onContacted?: (method: "call" | "sms", note?: string) => void;
 }
@@ -16,6 +17,7 @@ export default function ContactDriverModal({
   onClose,
   name,
   phone,
+  phoneFull,
   busPlate,
   onContacted,
 }: ContactDriverModalProps) {
@@ -23,7 +25,7 @@ export default function ContactDriverModal({
   const [lastAction, setLastAction] = useState<string | null>(null);
 
   const handleCall = () => {
-    window.location.href = `tel:${phone.replace(/\D/g, "")}`;
+    window.location.href = `tel:${phoneFull.replace(/\D/g, "")}`;
     onContacted?.("call", note.trim() || undefined);
     setLastAction(`已发起电话呼叫 ${phone}`);
     setNote("");
@@ -31,7 +33,7 @@ export default function ContactDriverModal({
 
   const handleSms = () => {
     const body = note ? `?body=${encodeURIComponent(note)}` : "";
-    window.location.href = `sms:${phone.replace(/\D/g, "")}${body}`;
+    window.location.href = `sms:${phoneFull.replace(/\D/g, "")}${body}`;
     onContacted?.("sms", note.trim() || undefined);
     setLastAction(`已打开短信应用 ${phone}`);
     setNote("");
@@ -124,6 +126,7 @@ export default function ContactDriverModal({
 interface ContactButtonProps {
   name: string;
   phone: string;
+  phoneFull: string;
   busPlate?: string;
   onContacted?: (method: "call" | "sms", note?: string) => void;
   variant?: "danger" | "success" | "primary" | "icon";
@@ -134,6 +137,7 @@ interface ContactButtonProps {
 export function ContactButton({
   name,
   phone,
+  phoneFull,
   busPlate,
   onContacted,
   variant = "success",
@@ -164,6 +168,7 @@ export function ContactButton({
         onClose={() => setIsOpen(false)}
         name={name}
         phone={phone}
+        phoneFull={phoneFull}
         busPlate={busPlate}
         onContacted={onContacted}
       />

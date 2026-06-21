@@ -8,27 +8,46 @@ import {
   CheckCircle2,
   AlertTriangle,
   Shield,
+  AlertCircle,
+  History,
+  Bus as BusIcon,
 } from "lucide-react";
 import Modal from "@/components/common/Modal";
 import StatusBadge from "@/components/common/StatusBadge";
 import { ContactButton } from "@/components/common/ContactDriverModal";
 import { riskConfig } from "@/utils/risk";
-import type { Bus, RiskInfo } from "@/types";
+import { useAppStore } from "@/store";
+import type { Bus, RiskInfo, ShiftType } from "@/types";
 import { useCountdown } from "@/hooks/useTimer";
 
 interface BusDetailModalProps {
   bus: Bus | null;
   risk?: RiskInfo;
+  shiftType?: ShiftType;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function BusDetailModal({ bus, risk, isOpen, onClose }: BusDetailModalProps) {
+export default function BusDetailModal({
+  bus,
+  risk,
+  shiftType = "morning",
+  isOpen,
+  onClose,
+}: BusDetailModalProps) {
   const timeLeft = useCountdown(bus?.nextStop.etaMinutes || 0);
+  const alerts = useAppStore((s) => s.alerts);
+  const resolvedAlerts = useAppStore((s) => s.resolvedAlerts);
 
   if (!bus) return null;
 
   const hasRisk = risk && risk.level !== "none";
+  const progressField = shiftType === "morning" ? "morningProgress" : "afternoonProgress";
+  const progress = bus[progressField];
+  const busAlerts = [...alerts, ...resolvedAlerts].filter(
+    (a) => a.busId === bus.id
+  );
+  const activeAlerts = busAlerts.filter((a) => a.status !== "resolved");
 
   return (
     <Modal
@@ -112,6 +131,93 @@ export default function BusDetailModal({ bus, risk, isOpen, onClose }: BusDetail
             </div>
           </div>
 
+          {progress && (
+            <div className="card-base p-4">
+              <h3 className="text-sm font-bold text-navy-200 mb-4 flex items-center gap-2">
+                <BusIcon className="w-4 h-4 text-accent-yellow" />
+                本班次进度
+                <span className="ml-auto text-xs text-navy-400 font-normal">
+                  {shiftType === "morning" ? "早送" : "晚接"}班次
+                </span>
+              </h3>
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                <div className="text-center p-2 bg-navy-900/40 rounded-lg">
+                  <div className="text-xl font-bold text-white font-mono">
+                    {progress.completedStops}/{progress.totalStops}
+                  </div>
+                  <div className="text-xs text-navy-400">完成站点</div>
+                </div>
+                <div className="text-center p-2 bg-navy-900/40 rounded-lg">
+                  <div className="text-xl font-bold text-accent-green font-mono">
+                    {progress.pickedStudents}
+                  </div>
+                  <div className="text-xs text-navy-400">已接学生</div>
+                </div>
+                <div className="text-center p-2 bg-navy-900/40 rounded-lg">
+                  <div className="text-xl font-bold text-accent-yellow font-mono">
+                    {progress.pendingStudents}
+                  </div>
+                  <div className="text-xs text-navy-400">待接学生</div>
+                </div>
+                <div className="text-center p-2 bg-navy-900/40 rounded-lg">
+                  <div className="text-xl font-bold text-accent-blue font-mono">
+                    {progress.totalStops > 0 ? Math.round((progress.completedStops / progress.totalStops) * 100) : 0}%
+                  </div>
+                  <div className="text-xs text-navy-400">完成进度</div>
+                </div>
+              </div>
+              <div className="w-full h-2 bg-navy-700 rounded-full mb-4 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-accent-blue to-accent-green rounded-full transition-all duration-500"
+                  style={{
+                    width: `${progress.totalStops > 0 ? (progress.completedStops / progress.totalStops) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                {progress.stops.map((stop, idx) => (
+                  <div
+                    key={stop.id}
+                    className={`flex items-center gap-3 p-2 rounded-lg ${
+                      stop.completed ? "bg-accent-green/5" : "bg-navy-900/30"
+                    }`}
+                  >
+                    <div
+                      className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        stop.completed
+                          ? "bg-accent-green text-white"
+                          : "bg-navy-700 text-navy-400"
+                      }`}
+                    >
+                      {stop.completed ? (
+                        <CheckCircle2 className="w-4 h-4" />
+                      ) : (
+                        <span className="text-xs font-bold">{idx + 1}</span>
+                      )}
+                    </div>
+                    <span
+                      className={`text-sm flex-1 ${
+                        stop.completed ? "text-accent-green" : "text-navy-300"
+                      }`}
+                    >
+                      {stop.name}
+                    </span>
+                    {stop.studentsToPick && (
+                      <span className="text-xs text-navy-400">
+                        {stop.studentsToPick}人
+                      </span>
+                    )}
+                    {stop.completeTime && (
+                      <span className="text-xs text-navy-500 font-mono">
+                        {stop.completeTime}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="card-base p-4">
             <h3 className="text-sm font-bold text-navy-200 mb-4 flex items-center gap-2">
               <Users className="w-4 h-4 text-accent-green" />
@@ -156,6 +262,81 @@ export default function BusDetailModal({ bus, risk, isOpen, onClose }: BusDetail
               </div>
             )}
           </div>
+
+          {busAlerts.length > 0 && (
+            <div className="card-base p-4">
+              <h3 className="text-sm font-bold text-navy-200 mb-4 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-accent-red" />
+                本班次异常记录
+                <span className="ml-auto text-xs text-navy-400 font-normal">
+                  共 {busAlerts.length} 条记录
+                </span>
+              </h3>
+              {activeAlerts.length > 0 && (
+                <div className="mb-4">
+                  <div className="text-xs font-semibold text-accent-red mb-2 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    待处理（{activeAlerts.length}）
+                  </div>
+                  <div className="space-y-2">
+                    {activeAlerts.map((alert) => (
+                      <div
+                        key={alert.id}
+                        className="p-3 bg-accent-red/5 border border-accent-red/20 rounded-lg"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span
+                            className={`status-badge text-xs ${
+                              alert.level === "high"
+                                ? "bg-accent-red/15 text-accent-red"
+                                : alert.level === "medium"
+                                ? "bg-accent-yellow/15 text-accent-yellow"
+                                : "bg-accent-blue/15 text-accent-blue"
+                            }`}
+                          >
+                            {alert.typeName}
+                          </span>
+                          <span className="text-xs text-navy-400 font-mono ml-auto">
+                            {alert.timestamp.split(" ")[1]}
+                          </span>
+                        </div>
+                        <p className="text-xs text-navy-300">{alert.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div>
+                <div className="text-xs font-semibold text-navy-300 mb-2 flex items-center gap-1.5">
+                  <History className="w-3.5 h-3.5" />
+                  历史记录（{busAlerts.filter((a) => a.status === "resolved").length}）
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {busAlerts
+                    .filter((a) => a.status === "resolved")
+                    .map((alert) => (
+                      <div
+                        key={alert.id}
+                        className="p-3 bg-navy-900/40 border border-navy-700/30 rounded-lg"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="status-badge text-xs bg-accent-green/15 text-accent-green">
+                            {alert.typeName}
+                          </span>
+                          <span className="text-xs text-navy-500 font-mono ml-auto">
+                            {alert.timestamp.split(" ")[1]}
+                          </span>
+                        </div>
+                        <p className="text-xs text-navy-400 mb-1">{alert.description}</p>
+                        <p className="text-xs text-navy-500">
+                          处理结果：{alert.handleResult || "已解决"}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-4">
@@ -176,6 +357,7 @@ export default function BusDetailModal({ bus, risk, isOpen, onClose }: BusDetail
             <ContactButton
               name={bus.driver.name}
               phone={bus.driver.phone}
+              phoneFull={bus.driver.phoneFull}
               busPlate={bus.plateNumber}
               variant="success"
               label={`联系司机`}
@@ -200,6 +382,7 @@ export default function BusDetailModal({ bus, risk, isOpen, onClose }: BusDetail
             <ContactButton
               name={bus.attendant.name}
               phone={bus.attendant.phone}
+              phoneFull={bus.attendant.phoneFull}
               busPlate={bus.plateNumber}
               variant="primary"
               label={`联系照管员`}
